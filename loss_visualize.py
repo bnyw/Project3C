@@ -14,7 +14,7 @@ interval = []
 last = datetime.strptime(samples[0][0], '%d/%m/%Y %H:%M:%S.%f')
 for sample in samples:
     t = datetime.strptime(sample[0], '%d/%m/%Y %H:%M:%S.%f')
-    interval.append((t-last).microseconds)
+    interval.append((t-last).microseconds/1000)
     last = t
 
 interval_np = np.around(np.array(interval)/4000)
