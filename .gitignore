@@ -1,0 +1,8 @@
+.vscode/settings.json
+__pycache__/live_plotter.cpython-38.pyc
+__pycache__/spo2.cpython-38.pyc
+app1.py
+app25.py
+SaveToFile.py
+test_mqtt.py
+live_plotter.py
