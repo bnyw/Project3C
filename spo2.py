@@ -1,34 +1,40 @@
 import numpy as np
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, peak_prominences
 import matplotlib.pyplot as plt
 from numpy.fft import fft, ifft
+from arr import mutual, between
 
-FILENAME = "data_asia.txt"
-DIST = 100
-START, END = 1750, 2000
+FILENAME = "data.txt"
+DIST = 120
+PROM = 120
+START, END = 2200, 2600
 REDMUL, IRMUL = 1,4
 
-def I(input_signal):
-    global DIST
-    pos_peaks, _ = find_peaks(input_signal, distance=DIST)
-    neg_peaks, _ = find_peaks(-input_signal, distance=DIST)
+def peaks(input_signal, btw = False):
+    pp, _ = find_peaks(input_signal, distance=DIST, prominence=PROM)
+    np, _ = find_peaks(-input_signal, distance=DIST, prominence=PROM)
 
-    length = min(len(pos_peaks),len(neg_peaks))
-    AC = (input_signal[pos_peaks][:length] - input_signal[neg_peaks][:length])
-    DC = input_signal[pos_peaks][:length] - AC/2
-    try:
-        I = np.mean(AC/DC)
-    except RuntimeWarning:
-        print("Except",AC)
-    return I, pos_peaks, neg_peaks
+    if btw:
+        return between(pp,np)
+    return (pp, np)
 
 def R(red, ir, AC_multiplier = [1,1]):
-    red_I, red_pos_peaks, red_neg_peaks = I(red)
-    ir_I, ir_pos_peaks, ir_neg_peaks = I(ir)
+    rPeak, rValley = peaks(red, btw = True)
+    irPeak, irValley = peaks(ir, btw = True)
+    
+    rPeak, irPeak = mutual(rPeak,irPeak)
+    rValley, irValley = mutual(rValley,irValley)
 
-    R = (red_I*AC_multiplier[0])/(ir_I*AC_multiplier[1])
-    pos_peaks = [red_pos_peaks, ir_pos_peaks]
-    neg_peaks = [red_neg_peaks, ir_neg_peaks]
+    rAC = red[rPeak] - red[rValley]
+    irAC = ir[irPeak] - ir[irValley]
+
+    nume = (rAC/irAC)*(AC_multiplier[0]/AC_multiplier[1])
+    denom = (ir[irPeak] - irAC/2)/(red[rPeak] - rAC/2)
+
+    R = np.mean(nume/denom)
+
+    pos_peaks = [rPeak, irPeak]
+    neg_peaks = [rValley, irValley]
 
     return R, pos_peaks, neg_peaks
 
@@ -73,11 +79,11 @@ if __name__ == "__main__":
 
 
     axes[1].plot(redC, c = "red", label = "RED^")
-    axes[1].plot(norm_pos[0], redC[norm_pos[0]], "x")
-    axes[1].plot(norm_neg[0], redC[norm_neg[0]], "x")
+    axes[1].plot(hat_pos[0], redC[hat_pos[0]], "x")
+    axes[1].plot(hat_neg[0], redC[hat_neg[0]], "x")
 
     axes[1].plot(irC, c = "black", label = "IR^")
-    axes[1].plot(norm_pos[1], irC[norm_pos[1]], "x")
-    axes[1].plot(norm_neg[1], irC[norm_neg[1]], "x")
+    axes[1].plot(hat_pos[1], irC[hat_pos[1]], "x")
+    axes[1].plot(hat_neg[1], irC[hat_neg[1]], "x")
 
     plt.show()

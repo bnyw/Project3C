@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from spo2 import R
 
-f = open("data_asia.txt",'w')
+fname = "data_eyeta.txt"
+f = open(fname,'w')
 f.write("")
 f.close()
 
@@ -64,7 +65,7 @@ def on_message(client, userdata, message):
     global y_vec,line,x_vec,c,r,ir
 
     samples = str(message.payload.decode("utf-8")).split('END')[0].split('#')
-    f = open("data_asia.txt",'a+')
+    f = open(fname,'a+')
     l = []
     for sample in samples:
             if len(sample) != 0:
