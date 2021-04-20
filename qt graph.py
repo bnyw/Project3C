@@ -2,27 +2,28 @@ from pyqtgraph.Qt import QtGui, QtCore
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.ptime import time
+from spo2 import read_from_file
+
 app = pg.mkQApp("Plot Speed Test")
+red, ir = (np.array(x) for x in read_from_file())
 
 p = pg.plot()
 p.setWindowTitle('pyqtgraph example: PlotSpeedTest')
-p.setRange(QtCore.QRectF(0, -10, 5000, 20)) 
+p.setRange(QtCore.QRectF(0, 0, 500, max(red))) 
 p.setLabel('bottom', 'Index', units='B')
-curve = p.plot()
 
-#curve.setFillBrush((0, 0, 100, 100))
-#curve.setFillLevel(0)
+curve1 = p.plot(pen='r')
+curve2 = p.plot(pen='w')
 
-#lr = pg.LinearRegionItem([100, 4900])
-#p.addItem(lr)
-
-data = np.random.normal(size=(50,5000))
 ptr = 0
 lastTime = time()
 fps = None
 def update():
-    global curve, data, ptr, p, lastTime, fps
-    curve.setData(data[ptr%10])
+    global curve1, red, ir, ptr, p, lastTime, fps
+    if ptr+500 == len(red):
+        ptr = 0
+    curve1.setData(red[ptr:ptr+500])
+    curve2.setData(ir[ptr:ptr+500])
     ptr += 1
     now = time()
     dt = now - lastTime

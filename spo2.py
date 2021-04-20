@@ -58,7 +58,7 @@ def Calibrated(input_signal, mul):
     ft[s:e] = ft[s:e]*mul
     return ifft(ft).real
 
-if __name__ == "__main__":
+def read_from_file():
     data = open(FILENAME,"r").read().replace("'","").split("\n")
     samples = [sample.split(", ") for sample in data][:-1]
 
@@ -66,6 +66,11 @@ if __name__ == "__main__":
     for sample in samples:
         red.append(int(sample[1]))
         ir.append(int(sample[2]))
+
+    return red, ir
+
+if __name__ == "__main__":
+    red, ir = read_from_file()
 
     red = np.array(red[START:END])
     ir = np.array(ir[START:END])
