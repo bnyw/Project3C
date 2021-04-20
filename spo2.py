@@ -1,37 +1,49 @@
 import numpy as np
-from scipy.signal import find_peaks, peak_prominences
+from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 from numpy.fft import fft, ifft
 from arr import mutual, between
 
 FILENAME = "data.txt"
-DIST = 120
-PROM = 120
-START, END = 2200, 2600
+DIST = 80
+PROM = 100
+START, END = 1900, 2900
 REDMUL, IRMUL = 1,4
 
-def peaks(input_signal, btw = False):
-    pp, _ = find_peaks(input_signal, distance=DIST, prominence=PROM)
-    np, _ = find_peaks(-input_signal, distance=DIST, prominence=PROM)
+def peaks(input_signal):
+    try:
+        peak, _ = find_peaks(input_signal, distance=DIST, prominence=PROM)
+        valley, _ = find_peaks(-input_signal, distance=DIST, prominence=PROM)
+    except ValueError:
+        print(input_signal)
 
-    if btw:
-        return between(pp,np)
-    return (pp, np)
+    peak, valley = between(peak, valley)
+
+    s = np.mean((input_signal[peak] - input_signal[valley])/2)
+    u = input_signal[peak] - s
+
+    temp = []
+    i = 0
+
+    # Eliminate outliers
+    for p in peak:
+        if input_signal[p] <= (u[i]+(2*s)) and input_signal[p] >= (u[i]-(2*s)):
+            temp.append(p)
+        i += 1
+
+    return (peak, valley)
 
 def R(red, ir, AC_multiplier = [1,1]):
-    rPeak, rValley = peaks(red, btw = True)
-    irPeak, irValley = peaks(ir, btw = True)
-    
-    rPeak, irPeak = mutual(rPeak,irPeak)
-    rValley, irValley = mutual(rValley,irValley)
+    rPeak, rValley = peaks(red)
+    irPeak, irValley = peaks(ir)
 
-    rAC = red[rPeak] - red[rValley]
-    irAC = ir[irPeak] - ir[irValley]
+    rAC = np.mean(red[rPeak]) - np.mean(red[rValley])
+    irAC = np.mean(ir[irPeak]) - np.mean(ir[irValley])
 
-    nume = (rAC/irAC)*(AC_multiplier[0]/AC_multiplier[1])
-    denom = (ir[irPeak] - irAC/2)/(red[rPeak] - rAC/2)
+    nume = (rAC/(np.mean(red[rPeak]) - rAC/2))*AC_multiplier[0]
+    denom = (irAC/(np.mean(ir[irPeak]) - irAC/2))*AC_multiplier[1]
 
-    R = np.mean(nume/denom)
+    R = nume/denom
 
     pos_peaks = [rPeak, irPeak]
     neg_peaks = [rValley, irValley]
@@ -39,8 +51,11 @@ def R(red, ir, AC_multiplier = [1,1]):
     return R, pos_peaks, neg_peaks
 
 def Calibrated(input_signal, mul):
+    s = 5
+    e = 500
     ft = fft(input_signal)
-    ft[1:] = ft[1:]*mul
+    ft[e:] = ft[e:]*0
+    ft[s:e] = ft[s:e]*mul
     return ifft(ft).real
 
 if __name__ == "__main__":
@@ -52,20 +67,17 @@ if __name__ == "__main__":
         red.append(int(sample[1]))
         ir.append(int(sample[2]))
 
-    # RED
     red = np.array(red[START:END])
-
-    # INFRARED
     ir = np.array(ir[START:END])
-
-    R1, norm_pos, norm_neg = R(red, ir)
-    R2, hat_pos, hat_neg = R(red, ir, [REDMUL,IRMUL])
-
-    print("R", R1,"R^", R2)
-    print('SpO2 =', 110-(25*R1), 'SpO2^ =', 110-(25*R2))
 
     redC = Calibrated(red, REDMUL)
     irC = Calibrated(ir, IRMUL)
+
+    R1, norm_pos, norm_neg = R(red, ir)
+    R2, hat_pos, hat_neg = R(redC, irC)
+
+    print("R", R1,"R^", R2)
+    print('SpO2 =', 110-(25*R1), 'SpO2^ =', 110-(25*R2))
 
     fig, axes = plt.subplots(1, 2)
 
@@ -77,6 +89,7 @@ if __name__ == "__main__":
     axes[0].plot(norm_pos[1], ir[norm_pos[1]], "x")
     axes[0].plot(norm_neg[1], ir[norm_neg[1]], "x")
 
+    axes[0].legend(loc='best')
 
     axes[1].plot(redC, c = "red", label = "RED^")
     axes[1].plot(hat_pos[0], redC[hat_pos[0]], "x")
@@ -85,5 +98,7 @@ if __name__ == "__main__":
     axes[1].plot(irC, c = "black", label = "IR^")
     axes[1].plot(hat_pos[1], irC[hat_pos[1]], "x")
     axes[1].plot(hat_neg[1], irC[hat_neg[1]], "x")
+
+    axes[1].legend(loc='best')
 
     plt.show()

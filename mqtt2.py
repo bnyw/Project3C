@@ -3,6 +3,7 @@ from time import sleep
 import matplotlib.pyplot as plt
 import numpy as np
 from spo2 import R
+import json
 
 fname = "data_eyeta.txt"
 f = open(fname,'w')
@@ -17,6 +18,9 @@ line = []
 c = 0
 r = []
 ir = []
+
+# def CLST():
+#     client.loop_stop()
 
 def live_plotter(x_vec,y_data,line,identifier='',pause_time=0.00000001):
     if line==[]:
@@ -61,10 +65,37 @@ def live_plotter(x_vec,y_data,line,identifier='',pause_time=0.00000001):
     # return line so we can update it again in the next iteration
     return line
 
-def on_message(client, userdata, message):
-    global y_vec,line,x_vec,c,r,ir
+def ppg_setting():
+    """
+    led     : "ledBrightness" :   Options: 0=Off to 255=50mA \n
+    savg    : "sampleAverage" :   Options: 1, 2, 4, 8, 16, 32 \n
+    mode    : "ledMode"       :   Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green \n
+    sr      : "sampleRate"    :   Options: 50, 100, 200, 400, 800, 1000, 1600, 3200 \n
+    pwm     : "pulseWidth"    :   Options: 69, 118, 215, 411 \n
+    range   : "adcRange"      :   Options: 2048, 4096, 8192, 16384 \n
+    """
+    setting_dict = {
+        "ledBrightness" : 70, #Options: 0=Off to 255=50mA
+        "sampleAverage" : 1,  #Options: 1, 2, 4, 8, 16, 32
+        "ledMode" : 2,        #Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
+        "sampleRate" : 400,  #Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
+        "pulseWidth" : 215,   #Options: 69, 118, 215, 411
+        "adcRange" : 16384   #Options: 2048, 4096, 8192, 16384
+    }
+    setting_json = json.dumps(setting_dict)
+    client.publish("esp32/ppg_setting", setting_json)
+
+def esp_start_transmittion():
+    client.publish("esp32/start", "just some text it doesn't matter")
+
+def esp_stop_transmittion():
+    client.publish("esp32/stop", "just some text it doesn't matter")
+
+def data(message):
+    global y_vec, line, x_vec, c, r, ir
 
     samples = str(message.payload.decode("utf-8")).split('END')[0].split('#')
+    
     f = open(fname,'a+')
     l = []
     for sample in samples:
@@ -76,19 +107,19 @@ def on_message(client, userdata, message):
     
     f.close()
 
-    if c == 16:
+    r.extend([int(sample[1]) for sample in l])
+    ir.extend([int(sample[2]) for sample in l])
+    c = c + 1
+    if c == 20:
         c = 0
-        r = np.array([int(sample[1]) for sample in l])
-        ir = np.array([int(sample[2]) for sample in l])
+
+        r = np.array(r)
+        ir = np.array(ir)
         
-        print(110-25*R(r, ir)[0])
+        print("normal :", 110-25*R(r, ir)[0], "pre-calibrated :", 110-25*R(r, ir, [1,4])[0])
 
         r = []
         ir = []
-    else:
-        r.append(int(sample[1]) for sample in l)
-        ir.append(int(sample[2]) for sample in l)
-        c = c + 1
 
 
     for i in range(3):
@@ -99,6 +130,10 @@ def on_message(client, userdata, message):
     for i in range(3):
         y_vec[i] = np.append(y_vec[i][50:],[0]*50) #delete 1st-25th data point
 
+def on_message(client, userdata, message):
+    if message.topic == "esp32/data":
+        data(message)
+    
 broker_address = "127.0.0.1" 
 
 client = mqtt.Client("P1") #create new instance
@@ -107,8 +142,14 @@ client.on_message=on_message #attach function to callback
 client.connect(broker_address) #connect to broker
 client.subscribe("esp32/data") #subscribe to topic
 
-# client.loop_start()
-# sleep(10)
-# client.loop_stop
 
-client.loop_forever()
+
+if __name__ == "__main__":
+    ppg_setting()
+    client.loop_start()
+    esp_start_transmittion()
+    sleep(10)
+    esp_stop_transmittion()
+    # plt.close('all')
+    client.loop_stop()
+
