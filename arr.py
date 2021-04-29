@@ -34,46 +34,63 @@ def mutual(arr_a, arr_b):
             temp = (a, b)
     
     return temp
-    # raise ValueError(a,b)
 
-def between(peak, valley):
+def between(peaks, valleys) -> list:
     """
-    peak should not have an unexpected value
+    Retrive 2 array and construct 2 new array that it value are alternate between each pair of value
+    \nsuch as [10 20 30 40] and [15 25 35 45] are output from [10 20 30 40], [15 16 17 18 25 35 36 45]
+    \npeak shouldn't have an unexpected value and must occur in ascending order
     """
-    i = 0
-    k = 0
+    i ,k = 0, 0
 
     la = []
     lb = []
 
-    lastPair = False
-    # check if last value of valley is more than last value of peak
+    # lastPair = False
+
+    # if len(valleys) >= len(peaks):
+    # check if each value of valleys is more than last value of peaks
+    # for j, valley in enumerate(valleys):
+    #     if valley > peaks[-1]:
+    #         # if yes store it value and delete the rest from array
+    #         lastPair = True
+    #         temp = valley
+    #         valleys = np.delete(valleys, np.s_[-len(valleys)+j:])
+    #         break
+
     try:
-        if valley[-1] > peak[-1]:
-            # if yes store it value and delete from arr
-            lastPair = True
-            temp = valley[-1]
-            valley = np.delete(valley, -1)
-    except IndexError:
-        print(valley, peak)
+        while i < len(peaks) - 1 and i+k <= len(valleys) - 1:
+            # if k == len(valleys)-i:
+            #     k = 1
+            #     i += 1
+            # print(i,k)
+            if valleys[i+k] >= peaks[i] and valleys[i+k] < peaks[i+1]:
+                la.append(peaks[i])
+                lb.append(valleys[i+k])
+                i += 1
+            else:
+                k += 1
+            
+            if k == len(valleys)-i:
+                k = 1
+                i += 1
 
+            # print(la,lb)
+    except Exception as e:
+        print(e,i,k,peaks,valleys)
+        # raise IndexError
 
-    while i < len(valley)-k:
-        if valley[i+k] >= peak[i] and valley[i+k] < peak[i+1]:
-            la.append(peak[i])
-            lb.append(valley[i+k])
-            i = i + 1
-        else:
-            k = k + 1
-
-    if lastPair:
-        la.append(peak[i])
-        lb.append(temp)
+    # try:
+    #     if lastPair:
+    #         la.append(peaks[i])
+    #         lb.append(temp)
+    # except Exception as e:
+    #     print(e,i,k,peaks,valleys,la,lb)
     
     return np.array(la), np.array(lb)
 
 if __name__ == "__main__":
-    a = np.array([26,177,342,488,638] )
-    b = np.array([178,341,485,624])
+    a = np.array([70, 234, 340, 461, 547, 648, 743])
+    b = np.array([99, 184, 288, 412, 508, 608, 802, 902])
 
-    print(mutual(a,b))
+    print(between(a,b))

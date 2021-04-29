@@ -1,1 +1,2 @@
-# Project3C
+# Project3C: ECG & SpO2 Monitoring
+

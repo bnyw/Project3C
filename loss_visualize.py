@@ -6,6 +6,7 @@ fname = "data_eyeta.txt"
 data = open(fname,"r").read().replace("'","").split("\n")
 samples = [sample.split(", ") for sample in data][:-1]
 
+
 STE = (datetime.strptime(samples[-1][0], '%d/%m/%Y %H:%M:%S.%f') - \
         datetime.strptime(samples[0][0], '%d/%m/%Y %H:%M:%S.%f'))
 
