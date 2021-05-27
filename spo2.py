@@ -3,6 +3,7 @@ from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 from numpy.fft import fft, ifft
 from arr import between
+from datetime import datetime
 
 FILENAME = "data.txt"
 DIST = 80
@@ -54,6 +55,24 @@ def Calibrated(input_signal, mul):
 
 def SPO2(R):
     return 110-(25*R)
+
+def HeartRate(pos, timestamp):
+    rPeak, irPeak = pos
+
+    if len(rPeak) <= 1:
+        return -1
+
+    t = []
+
+    for location in rPeak:
+        t.append(datetime.strptime(timestamp[location], '%d/%m/%Y %H:%M:%S.%f'))
+
+    ds_list = []
+    for i in range(len(t)-1):
+        ds = t[i+1] - t[i]
+        ds_list.append(ds.microseconds/1000000)
+
+    return 60/np.mean(ds_list)
 
 def read_from_file(fname):
     data = open(fname,"r").read().replace("'","").split("\n")

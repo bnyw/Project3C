@@ -7,12 +7,12 @@ from PySide6 import QtWidgets, QtGui, QtCore
 from ui import Ui_MainWindow
 from pyqtgraph.ptime import time
 
-from spo2 import R, SPO2
+from spo2 import R, SPO2, HeartRate
 
 import json
 import numpy as np
 
-class EPM(QtWidgets.QMainWindow, Ui_MainWindow):
+class ESM(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setupUi(self)
@@ -47,6 +47,7 @@ class EPM(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.ecgLine = self.ecg.plot(pen='g')
         self.ecg.setRange(QtCore.QRectF(0, 0, self.plot_size, 4096)) 
+        self.ecg.enableAutoRange()
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
@@ -54,12 +55,19 @@ class EPM(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lastTime = time()
         self.fps = None
         self.R_list = []
+        self.HR_list = []
 
-        self.red_data, self.ir_data, self.ecg_data = [], [], []
+        self.timestamp_data, self.red_data, self.ir_data, self.ecg_data = [], [], [], []
+
+        # Advance
+        self.timer2 = QtCore.QTimer()
+        self.timer2.timeout.connect(self.check_esp_status)
+        # self.timer2.start(10000)
 
     def open(self):
         self.client.connect(self.broker_address)
         self.client.subscribe("esp32/data")
+        self.client.subscribe("esp32/status")
         self.client.loop_start()
         self.set_esp_transmission_state(1)
 
@@ -94,11 +102,15 @@ class EPM(QtWidgets.QMainWindow, Ui_MainWindow):
     def set_esp_transmission_state(self, state):
         self.client.publish("esp32/transmission_state", state)
 
+    def check_esp_status(self):
+        self.client.publish("esp32/check_status", "some text")
+
     def trimData(self, Nleft):
         if len(self.red_data) > Nleft:
             self.red_data[:-Nleft] = []
             self.ir_data[:-Nleft] = []
             self.ecg_data[:-Nleft] = []
+            self.timestamp_data[:-Nleft] = []
 
     def data(self, message):
         samples = str(message.payload.decode("utf-8")).split('END')[0].split('#')
@@ -112,20 +124,23 @@ class EPM(QtWidgets.QMainWindow, Ui_MainWindow):
                     self.f.write(str(l[-1]).replace("[","").replace("]","\n"))
         # f.close()
 
-        self.red_data.extend([int(sample[1]) for sample in l])
-        self.ir_data.extend([int(sample[2]) for sample in l])
-        self.ecg_data.extend([int(sample[3]) for sample in l])
+        for sample in l:
+            self.timestamp_data.extend([sample[0]])
+            self.red_data.extend([int(sample[1])])
+            self.ir_data.extend([int(sample[2])])
+            self.ecg_data.extend([int(sample[3])])
 
     def on_message(self, client, userdata, message):
         if message.topic == "esp32/data":
             self.data(message)
+        elif message.topic == "esp32/status":
+            self.boardStatus.setText(str(message.payload.decode("utf-8")))
 
     def update(self):
         self.trimData(self.plot_size)
 
         self.redLine.setData(np.array(self.red_data))
         self.irLine.setData(np.array(self.ir_data))
-
         self.ecgLine.setData(np.array(self.ecg_data))
 
         self.now = time()
@@ -138,15 +153,22 @@ class EPM(QtWidgets.QMainWindow, Ui_MainWindow):
             s = np.clip(dt*3., 0, 1)
             self.fps = self.fps * (1-s) + (1.0/dt) * s
 
-        R_value = R(np.array(self.red_data), np.array(self.ir_data))[0]
+        R_value, posPeak, negPeak = R(np.array(self.red_data), np.array(self.ir_data))
         
         if isinstance(R_value, float):
             self.R_list.append(R_value)
+            HR = HeartRate(posPeak, self.timestamp_data)
+            if HR != -1:
+                self.HR_list.append(HR)
 
             if len(self.R_list) > 400:
                 self.R_list[:-400] = []
 
+            if len(self.HR_list) > 400:
+                self.HR_list[:-400] = []
+
             self.ppg.setTitle('%0.2f fps, SpO2: %0.2f, SpO2^: %0.2f' % (self.fps, SPO2(np.mean(self.R_list)), SPO2(np.mean(self.R_list)/3.43)))
+            self.ecg.setTitle('HeartRate: %d bpm' % (int(np.mean(self.HR_list))))
 
     def set_plot_size(self):
         self.plot_size = int(self.plotSize.value())
@@ -192,10 +214,10 @@ class EPM(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             self.pauseSave.setText("Pause")
 
-app = QtWidgets.QApplication(sys.argv)
-
-window = EPM()
-window.open()
-window.show()
-app.exec_()
-window.close()
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = ESM()
+    window.open()
+    window.show()
+    app.exec_()
+    window.close()
